@@ -98,6 +98,14 @@ UYATLI_SOZLAR = {"am", "ammisan", "ammislar", "ammislar?", "ammisizlar", "ammisi
 SUSPECT_KEYWORDS = {"open game", "play", "играть", "открыть игру", "game", "cattea", "gamee", "hamster", "notcoin", "tap to earn", "earn", "clicker"}
 SUSPECT_DOMAINS = {"cattea", "gamee", "hamster", "notcoin", "tgme", "t.me/gamee", "textra.fun", "ton"}
 
+
+import os
+import json
+import asyncio
+from asyncio import sleep
+from telegram.error import Forbidden, BadRequest, RetryAfter, TimedOut, NetworkError, TelegramError
+from telegram.constants import ParseMode
+
 # ----------- Helpers -----------
 async def is_admin(update: Update) -> bool:
     chat = update.effective_chat
@@ -106,13 +114,16 @@ async def is_admin(update: Update) -> bool:
     if not chat:
         return False
     try:
+        # Anonymous admin: message on behalf of the group itself
         if msg and getattr(msg, "sender_chat", None):
             sc = msg.sender_chat
             if sc.id == chat.id:
                 return True
+            # Linked channel posting into supergroup
             linked_id = getattr(chat, "linked_chat_id", None)
             if linked_id and sc.id == linked_id:
                 return True
+        # Regular user-based admin check
         if user:
             member = await update.get_bot().get_chat_member(chat.id, user.id)
             return member.status in ("administrator", "creator", "owner")
@@ -120,11 +131,13 @@ async def is_admin(update: Update) -> bool:
     except Exception as e:
         log.warning(f"is_admin tekshiruvda xatolik: {e}")
         return False
+
 async def is_privileged_message(msg, bot) -> bool:
     """Adminlar, creatorlar yoki guruh/linked kanal nomidan yozilgan (sender_chat) xabarlar uchun True."""
     try:
         chat = msg.chat
         user = msg.from_user
+        # Anonymous admin (group name) yoki linked kanal
         if getattr(msg, "sender_chat", None):
             sc = msg.sender_chat
             if sc.id == chat.id:
@@ -132,6 +145,7 @@ async def is_privileged_message(msg, bot) -> bool:
             linked_id = getattr(chat, "linked_chat_id", None)
             if linked_id and sc.id == linked_id:
                 return True
+        # Odatdagi admin/creator
         if user:
             member = await bot.get_chat_member(chat.id, user.id)
             if member.status in ("administrator", "creator", "owner"):
@@ -139,6 +153,7 @@ async def is_privileged_message(msg, bot) -> bool:
     except Exception as e:
         log.warning(f"is_privileged_message xatolik: {e}")
     return False
+
 async def kanal_tekshir(user_id: int, bot) -> bool:
     global KANAL_USERNAME
     if not KANAL_USERNAME:
@@ -195,6 +210,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parse_mode="HTML",
     reply_markup=InlineKeyboardMarkup(kb)
 )
+
+    # Auto-subscribe private chat for DM updates
+    try:
+        if update.effective_chat.type == 'private':
+            add_chat_to_subs(update.effective_chat)
+    except Exception:
+        pass
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
@@ -695,6 +717,10 @@ def main():
     app.add_handler(CommandHandler("cleangroup", cleangroup))
     app.add_handler(CommandHandler("count", count_cmd))
     app.add_handler(CommandHandler("replycount", replycount))
+    app.add_handler(CommandHandler(\"subon\", subon))
+    app.add_handler(CommandHandler(\"suboff\", suboff))
+    app.add_handler(CommandHandler(\"broadcast\", broadcast))
+    app.add_handler(CommandHandler(\"broadcastpost\", broadcastpost))
     app.add_handler(CommandHandler("cleanuser", cleanuser))
 
     # Callbacks
@@ -741,3 +767,139 @@ async def on_my_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
+
+
+
+# ----------- Broadcast subscriptions -----------
+SUB_USERS_FILE = "subs_users.json"
+SUB_GROUPS_FILE = "subs_groups.json"
+
+def _load_ids(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return set(json.load(f))
+    except Exception:
+        return set()
+
+def _save_ids(path, data: set):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(sorted(list(data)), f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        log.warning(f"IDs saqlashda xatolik: {e}")
+
+def add_chat_to_subs(chat):
+    if chat.type in ("group", "supergroup"):
+        s = _load_ids(SUB_GROUPS_FILE)
+        s.add(chat.id)
+        _save_ids(SUB_GROUPS_FILE, s)
+        return "group"
+    else:
+        s = _load_ids(SUB_USERS_FILE)
+        s.add(chat.id)
+        _save_ids(SUB_USERS_FILE, s)
+        return "user"
+
+def remove_chat_from_subs(chat):
+    if chat.type in ("group", "supergroup"):
+        s = _load_ids(SUB_GROUPS_FILE)
+        if chat.id in s:
+            s.remove(chat.id)
+            _save_ids(SUB_GROUPS_FILE, s)
+        return "group"
+    else:
+        s = _load_ids(SUB_USERS_FILE)
+        if chat.id in s:
+            s.remove(chat.id)
+            _save_ids(SUB_USERS_FILE, s)
+        return "user"
+
+
+
+# ----------- Owner control -----------
+# OWNER_ID ni .env orqali berish mumkin: OWNER_ID=123456789
+OWNER_IDS = {int(os.getenv("OWNER_ID", "0"))}  # Bir nechta bo'lsa {111,222,333}
+def is_owner(update: Update) -> bool:
+    u = update.effective_user
+    return bool(u and u.id in OWNER_IDS)
+
+
+
+async def subon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Joriy chatni xabarnomaga yozish. Guruhda faqat admin."""
+    if update.effective_chat.type in ("group", "supergroup"):
+        if not await is_admin(update):
+            return await update.effective_message.reply_text("⛔ Faqat adminlar (guruh).")
+    typ = add_chat_to_subs(update.effective_chat)
+    if typ == "group":
+        await update.effective_message.reply_text("✅ Guruh yangiliklarga obuna qilindi.")
+    else:
+        await update.effective_message.reply_text("✅ Siz yangiliklarga obuna bo‘ldingiz.")
+
+async def suboff(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Joriy chatni xabarnomadan chiqarish."""
+    if update.effective_chat.type in ("group", "supergroup"):
+        if not await is_admin(update):
+            return await update.effective_message.reply_text("⛔ Faqat adminlar (guruh).")
+    typ = remove_chat_from_subs(update.effective_chat)
+    if typ == "group":
+        await update.effective_message.reply_text("❌ Guruh obunasi o‘chirildi.")
+    else:
+        await update.effective_message.reply_text("❌ Obunangiz o‘chirildi.")
+
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """(OWNER & DM) Matnli xabarni barcha DM obunachilarga yuborish."""
+    # Faqat DM va faqat OWNER
+    if update.effective_chat.type != "private":
+        return await update.effective_message.reply_text("⛔ Bu buyruq faqat DM (shaxsiy chat)da ishlaydi.")
+    if not is_owner(update):
+        return await update.effective_message.reply_text("⛔ Bu buyruq faqat bot egasiga ruxsat etilgan.")
+    text = " ".join(context.args).strip()
+    if not text and update.effective_message.reply_to_message:
+        text = update.effective_message.reply_to_message.text_html or update.effective_message.reply_to_message.caption_html
+    if not text:
+        return await update.effective_message.reply_text("Foydalanish: /broadcast Yangilanish matni")
+    users = _load_ids(SUB_USERS_FILE)
+    total = len(users)
+    ok = 0; fail = 0
+    await update.effective_message.reply_text(f"📣 DM jo‘natish boshlandi. Jami foydalanuvchilar: {total}")
+    for cid in list(users):
+        try:
+            await context.bot.send_message(cid, text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+            ok += 1
+            await asyncio.sleep(0.05)
+        except (Forbidden, BadRequest):
+            users.discard(cid); fail += 1
+        except RetryAfter as e:
+            await asyncio.sleep(int(getattr(e, "retry_after", 1)) + 1)
+        except (TimedOut, NetworkError, TelegramError):
+            fail += 1
+    _save_ids(SUB_USERS_FILE, users)
+    await update.effective_message.reply_text(f"✅ Yuborildi: {ok} ta, ❌ xatolik: {fail} ta.")
+
+async def broadcastpost(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """(OWNER & DM) Reply qilingan postni barcha DM obunachilarga yuborish."""
+    if update.effective_chat.type != "private":
+        return await update.effective_message.reply_text("⛔ Bu buyruq faqat DM (shaxsiy chat)da ishlaydi.")
+    if not is_owner(update):
+        return await update.effective_message.reply_text("⛔ Bu buyruq faqat bot egasiga ruxsat etilgan.")
+    msg = update.effective_message.reply_to_message
+    if not msg:
+        return await update.effective_message.reply_text("Foydalanish: /broadcastpost — oldin yubormoqchi bo‘lgan postga reply qiling.")
+    users = _load_ids(SUB_USERS_FILE)
+    total = len(users)
+    ok = 0; fail = 0
+    await update.effective_message.reply_text(f"📣 DM post tarqatish boshlandi. Jami foydalanuvchilar: {total}")
+    for cid in list(users):
+        try:
+            await context.bot.copy_message(chat_id=cid, from_chat_id=msg.chat_id, message_id=msg.message_id)
+            ok += 1
+            await asyncio.sleep(0.05)
+        except (Forbidden, BadRequest):
+            users.discard(cid); fail += 1
+        except RetryAfter as e:
+            await asyncio.sleep(int(getattr(e, "retry_after", 1)) + 1)
+        except (TimedOut, NetworkError, TelegramError):
+            fail += 1
+    _save_ids(SUB_USERS_FILE, users)
+    await update.effective_message.reply_text(f"✅ Yuborildi: {ok} ta, ❌ xatolik: {fail} ta.")
