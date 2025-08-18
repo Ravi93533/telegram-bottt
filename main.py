@@ -773,7 +773,8 @@ def main():
     app.add_handler(MessageHandler(media_filters & (~filters.COMMAND), reklama_va_soz_filtri))
 
     app.post_init = set_commands
-app.add_handler(CommandHandler("broadcast", broadcast))
+
+    app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("broadcastpost", broadcastpost))
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 async def on_my_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
