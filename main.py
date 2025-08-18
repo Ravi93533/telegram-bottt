@@ -717,10 +717,10 @@ def main():
     app.add_handler(CommandHandler("cleangroup", cleangroup))
     app.add_handler(CommandHandler("count", count_cmd))
     app.add_handler(CommandHandler("replycount", replycount))
-    app.add_handler(CommandHandler(\"subon\", subon))
-    app.add_handler(CommandHandler(\"suboff\", suboff))
-    app.add_handler(CommandHandler(\"broadcast\", broadcast))
-    app.add_handler(CommandHandler(\"broadcastpost\", broadcastpost))
+    app.add_handler(CommandHandler("subon", subon))
+    app.add_handler(CommandHandler("suboff", suboff))
+    app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(CommandHandler("broadcastpost", broadcastpost))
     app.add_handler(CommandHandler("cleanuser", cleanuser))
 
     # Callbacks
@@ -757,7 +757,7 @@ async def on_my_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=update.effective_chat.id,
                 text=(
                     '⚠️ Bot hozircha *admin emas*.\n'
-                    'Iltimos, pastdagi tugma orqali admin qiling, shunda barcha funksiyalar to\'liq ishlaydi.'
+                    'Iltimos, pastdagi tugma orqali admin qiling, shunda barcha funksiyalar to'liq ishlaydi.'
                 ),
                 reply_markup=kb,
                 parse_mode='Markdown'
