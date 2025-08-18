@@ -769,11 +769,11 @@ def main():
 
     app.post_init = set_commands
     
-app.add_handler(CommandHandler("subon", subon))
-app.add_handler(CommandHandler("suboff", suboff))
-app.add_handler(CommandHandler("broadcast", broadcast))
-app.add_handler(CommandHandler("broadcastpost", broadcastpost))
 
+    app.add_handler(CommandHandler("subon", subon))
+    app.add_handler(CommandHandler("suboff", suboff))
+    app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(CommandHandler("broadcastpost", broadcastpost))
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
