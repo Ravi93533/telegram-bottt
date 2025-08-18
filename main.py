@@ -818,7 +818,7 @@ def remove_chat_from_subs(chat):
 
 # ----------- Owner control -----------
 # OWNER_ID ni .env orqali berish mumkin: OWNER_ID=123456789
-OWNER_IDS = {int(os.getenv("OWNER_ID", "0"))}  # Bir nechta bo'lsa {111,222,333}
+OWNER_IDS = {165553982}  # Bir nechta bo'lsa {111,222,333}
 def is_owner(update: Update) -> bool:
     u = update.effective_user
     return bool(u and u.id in OWNER_IDS)
