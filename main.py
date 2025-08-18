@@ -788,7 +788,7 @@ async def on_my_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=update.effective_chat.id,
                 text=(
                     '⚠️ Bot hozircha *admin emas*.\n'
-                    'Iltimos, pastdagi tugma orqali admin qiling, shunda barcha funksiyalar to'liq ishlaydi.'
+                    "Iltimos, pastdagi tugma orqali admin qiling, shunda barcha funksiyalar to'liq ishlaydi."
                 ),
                 reply_markup=kb,
                 parse_mode='Markdown'
