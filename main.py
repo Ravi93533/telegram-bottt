@@ -236,6 +236,12 @@ def has_suspicious_buttons(msg) -> bool:
 
 # ----------- Commands -----------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Auto-subscribe: /start bosgan foydalanuvchini DM ro'yxatga qo'shamiz
+    try:
+        if update.effective_chat.type == 'private':
+            add_chat_to_subs(update.effective_chat)
+    except Exception:
+        pass
     kb = [[InlineKeyboardButton("➕ Guruhga qo‘shish", url=admin_add_link(context.bot.username))]]
     await update.effective_message.reply_text(
     "<b>САЛОМ👋</b>\n"
@@ -767,10 +773,7 @@ def main():
     app.add_handler(MessageHandler(media_filters & (~filters.COMMAND), reklama_va_soz_filtri))
 
     app.post_init = set_commands
-
-    app.add_handler(CommandHandler("subon", subon))
-    app.add_handler(CommandHandler("suboff", suboff))
-    app.add_handler(CommandHandler("broadcast", broadcast))
+app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("broadcastpost", broadcastpost))
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 async def on_my_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -796,19 +799,7 @@ async def on_my_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
 
-async def subon(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Joriy foydalanuvchini DM yangiliklarga yozish (faqat DM)."""
-    if update.effective_chat.type != "private":
-        return await update.effective_message.reply_text("ℹ️ Iltimos, bot bilan DM’da /subon bosing.")
-    add_chat_to_subs(update.effective_chat)
-    return await update.effective_message.reply_text("✅ Siz DM yangiliklarga obuna bo‘ldingiz.")
 
-async def suboff(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Obunani bekor qilish (faqat DM)."""
-    if update.effective_chat.type != "private":
-        return await update.effective_message.reply_text("ℹ️ Iltimos, bot bilan DM’da /suboff bosing.")
-    remove_chat_from_subs(update.effective_chat)
-    return await update.effective_message.reply_text("❌ Obunangiz o‘chirildi.")
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """(OWNER & DM) Matnni barcha DM obunachilarga yuborish."""
