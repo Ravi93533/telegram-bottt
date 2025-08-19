@@ -1,5 +1,5 @@
-from telegram import Chat, Message
 
+from telegram import Chat, Message
 
 def _extract_forward_origin_chat(msg: Message):
     fo = getattr(msg, "forward_origin", None)
@@ -9,22 +9,40 @@ def _extract_forward_origin_chat(msg: Message):
             return chat
     return getattr(msg, "forward_from_chat", None)
 
-
 def is_linked_channel_autoforward(msg: Message) -> bool:
+    """
+    Guruhga bog'langan kanaldan (linked channel) avtomatik forward qilingan postni aniqlash.
+    Ba'zi holatlarda Telegram originni yashiradi (HiddenUser: Telegram), shuning uchun:
+    - is_automatic_forward True bo'lsa
+    - va guruhda linked_chat_id mavjud bo'lsa
+    => postni o‘tkazib yuboramiz (bloklamaymiz).
+    """
     try:
         if not getattr(msg, "is_automatic_forward", False):
             return False
-        linked_id = getattr(msg.chat, "linked_chat_id", None)
+
+        chat = getattr(msg, "chat", None)
+        linked_id = getattr(chat, "linked_chat_id", None)
         if not linked_id:
             return False
+
+        # 1) sender_chat orqali tekshirish
+        sc = getattr(msg, "sender_chat", None)
+        if sc and getattr(sc, "id", None) == linked_id:
+            return True
+
+        # 2) forward_origin/from_chat orqali tekshirish
         fwd_chat = _extract_forward_origin_chat(msg)
         if fwd_chat and getattr(fwd_chat, "id", None) == linked_id:
             return True
+
+        # 3) Origin yashirilgan bo‘lsa ham, auto-forward + linked_chat_id bor — o‘tkazamiz
+        return True
     except Exception:
-        pass
-    return False
+        return False
+
 from telegram import Update, BotCommand, BotCommandScopeAllPrivateChats, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.constants import ChatMemberStatus
+from telegram.constants import ChatMemberStatus, ParseMode
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ChatMemberHandler, ContextTypes, filters
 
 def admin_add_link(bot_username: str) -> str:
@@ -123,13 +141,9 @@ UYATLI_SOZLAR = {"am", "ammisan", "ammislar", "ammislar?", "ammisizlar", "ammisi
 SUSPECT_KEYWORDS = {"open game", "play", "играть", "открыть игру", "game", "cattea", "gamee", "hamster", "notcoin", "tap to earn", "earn", "clicker"}
 SUSPECT_DOMAINS = {"cattea", "gamee", "hamster", "notcoin", "tgme", "t.me/gamee", "textra.fun", "ton"}
 
-import os
 import json
 import asyncio
-from telegram.constants import ParseMode
 from telegram.error import Forbidden, BadRequest, RetryAfter, TimedOut, NetworkError, TelegramError
-
-# ----------- Helpers -----------
 
 # ----------- DM Broadcast (Owner only) -----------
 SUB_USERS_FILE = "subs_users.json"
@@ -533,9 +547,9 @@ async def reklama_va_soz_filtri(update: Update, context: ContextTypes.DEFAULT_TY
     if not msg or not msg.chat or not msg.from_user:
         return
 
-    # 🔒 Linked kanalning avtomatik forward postlari — teginmaymiz (asosiy tuzatish)
-    if is_linked_channel_autoforward(msg):   # <= qo'shildi
-        return  # Telegram kanalidan auto-forward bo'lsa, filtrlamaymiz. :contentReference[oaicite:2]{index=2}
+    # 🔒 Linked kanalning avtomatik forward postlari — teginmaymiz
+    if is_linked_channel_autoforward(msg):
+        return
 
     # Admin/creator/guruh nomidan xabarlar — teginmaymiz
     if await is_privileged_message(msg, context.bot):
@@ -685,7 +699,7 @@ async def on_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-# Majburiy qo'shish filtri — yetmaganlarda 5 daqiqaga blok ham qo'yiladi
+# Majburiy qo'shish filtri — yetmaganlarda 3 daqiqaga blok
 async def majbur_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if MAJBUR_LIMIT <= 0:
         return
@@ -694,15 +708,15 @@ async def majbur_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 🔒 Linked kanal avtomatik forward — majburiy tekshiruvdan ham chiqaramiz
-    if is_linked_channel_autoforward(msg):   # <= qo'shildi
-        return  # Kanal postlari majburiy-limitga tushmaydi. :contentReference[oaicite:3]{index=3}
+    if is_linked_channel_autoforward(msg):
+        return
 
     if await is_privileged_message(msg, context.bot):
         return
 
     uid = msg.from_user.id
 
-    # Agar foydalanuvchi hanuz blokda bo'lsa — xabarini o'chirib, hech narsa yubormaymiz
+    # Agar foydalanuvchi hanuz blokda bo'lsa — xabarini o'chiramiz
     now = datetime.now(timezone.utc)
     key = (msg.chat_id, uid)
     until_old = BLOK_VAQTLARI.get(key)
@@ -725,7 +739,7 @@ async def majbur_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         return
 
-    # 5 daqiqaga blok (hozir 3 daqiqa)
+    # 3 daqiqaga blok
     until = datetime.now(timezone.utc) + timedelta(minutes=3)
     BLOK_VAQTLARI[(msg.chat_id, uid)] = until
     try:
@@ -739,7 +753,6 @@ async def majbur_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log.warning(f"Restrict failed: {e}")
 
     qoldi = max(MAJBUR_LIMIT - cnt, 0)
-    until_str = until.strftime('%H:%M')
     kb = [
         [InlineKeyboardButton("✅ Odam qo‘shdim", callback_data=f"check_added:{uid}")],
         [InlineKeyboardButton("🎟 Imtiyoz berish", callback_data=f"grant:{uid}")],
@@ -775,7 +788,7 @@ async def set_commands(app):
         scope=BotCommandScopeAllPrivateChats()
     )
 
-# --- DM Bepul tarqatish buyruqlari (oldinga olib chiqildi) ---
+# --- DM jo'natish buyruqlari ---
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """(OWNER & DM) Matnni barcha DM obunachilarga yuborish."""
     if update.effective_chat.type != "private":
@@ -865,7 +878,7 @@ def main():
 
     app.post_init = set_commands
 
-    # (buyruqlar endi tepada aniqlangan — NameError bo‘lmaydi)
+    # Broadcast buyruqlari
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("broadcastpost", broadcastpost))
 
@@ -894,7 +907,6 @@ async def on_my_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception:
             pass
-
 
 if __name__ == "__main__":
     main()
