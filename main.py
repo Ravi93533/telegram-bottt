@@ -10,10 +10,47 @@ def _extract_forward_origin_chat(msg: Message):
     return getattr(msg, "forward_from_chat", None)
 
 
-def is_linked_channel_autoforward(msg: Message) -> bool:
+
+# ---- Linked channel cache helpers (added) ----
+_GROUP_LINKED_ID_CACHE: dict[int, int | None] = {}
+
+async def _get_linked_id(chat_id: int, bot) -> int | None:
+    """Fetch linked_chat_id reliably using get_chat (cached)."""
+    if chat_id in _GROUP_LINKED_ID_CACHE:
+        return _GROUP_LINKED_ID_CACHE[chat_id]
+    try:
+        chat = await bot.get_chat(chat_id)
+        linked_id = getattr(chat, "linked_chat_id", None)
+        _GROUP_LINKED_ID_CACHE[chat_id] = linked_id
+        return linked_id
+    except Exception:
+        _GROUP_LINKED_ID_CACHE[chat_id] = None
+        return None
+# ---- end helpers ----
+async def is_linked_channel_autoforward(msg: Message, bot) -> bool:
+    """
+    TRUE faqat guruhning bog'langan kanalidan avtomatik forward bo'lgan postlar uchun.
+    - msg.is_automatic_forward True
+    - get_chat(chat_id).linked_chat_id mavjud
+    - va (sender_chat.id == linked_id) yoki (forward_origin chat.id == linked_id)
+    - origin yashirilgan bo‘lsa ham fallback True (is_automatic_forward bo‘lsa)
+    """
     try:
         if not getattr(msg, "is_automatic_forward", False):
             return False
+        linked_id = await _get_linked_id(msg.chat_id, bot)
+        if not linked_id:
+            return False
+        sc = getattr(msg, "sender_chat", None)
+        if sc and getattr(sc, "id", None) == linked_id:
+            return True
+        fwd_chat = _extract_forward_origin_chat(msg)
+        if fwd_chat and getattr(fwd_chat, "id", None) == linked_id:
+            return True
+        # Fallback: origin yashirilgan bo‘lishi mumkin
+        return True
+    except Exception:
+        return False
         linked_id = getattr(msg.chat, "linked_chat_id", None)
         if not linked_id:
             return False
@@ -530,14 +567,14 @@ async def on_grant_priv(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------- Filters -----------
 async def reklama_va_soz_filtri(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
-    if not msg or not msg.chat or not msg.from_user:
-        return
     # 🔒 Linked kanalning avtomatik forward postlari — teginmaymiz
     try:
-        if is_linked_channel_autoforward(msg):
+        if await is_linked_channel_autoforward(msg, context.bot):
             return
     except Exception:
         pass
+    if not msg or not msg.chat or not msg.from_user:
+        return
     # Admin/creator/guruh nomidan xabarlar — teginmaymiz
     if await is_privileged_message(msg, context.bot):
         return
@@ -690,9 +727,9 @@ async def majbur_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if MAJBUR_LIMIT <= 0:
         return
     msg = update.effective_message
-    # 🔒 Linked kanalning avtomatik forward postlari — majburiy tekshiruvdan chiqaramiz
+    # 🔒 Linked kanalning avtomatik forward postlari — teginmaymiz
     try:
-        if is_linked_channel_autoforward(msg):
+        if await is_linked_channel_autoforward(msg, context.bot):
             return
     except Exception:
         pass
