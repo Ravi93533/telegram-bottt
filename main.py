@@ -1,5 +1,5 @@
-
 from telegram import Chat, Message
+
 
 def _extract_forward_origin_chat(msg: Message):
     fo = getattr(msg, "forward_origin", None)
@@ -9,35 +9,22 @@ def _extract_forward_origin_chat(msg: Message):
             return chat
     return getattr(msg, "forward_from_chat", None)
 
+
 def is_linked_channel_autoforward(msg: Message) -> bool:
-    """
-    Avtomatik forward (kanal -> superguruh) postlarini aniqlash.
-    Agar xabar is_automatic_forward=True bo'lsa, darhol o‘tkazamiz —
-    ba'zi holatlarda Telegram originni yashiradi ("Telegram"),
-    lekin bu baribir kanalning auto-forward postidir.
-    Qo'shimcha ravishda sender_chat/forward_origin kanal bo'lsa ham o‘tkazamiz.
-    """
     try:
-        # 0) Har qanday auto-forward — o‘tkazib yuboriladi
-        if getattr(msg, "is_automatic_forward", False):
-            return True
-
-        # 1) Kanal nomidan yuborilgan (sender_chat.type == 'channel') — o‘tkazamiz
-        sc = getattr(msg, "sender_chat", None)
-        if sc and getattr(sc, "type", None) == "channel":
-            return True
-
-        # 2) Forward qilingan va manbasi kanal bo'lsa — ehtimol linked kanal postidir
+        if not getattr(msg, "is_automatic_forward", False):
+            return False
+        linked_id = getattr(msg.chat, "linked_chat_id", None)
+        if not linked_id:
+            return False
         fwd_chat = _extract_forward_origin_chat(msg)
-        if fwd_chat and getattr(fwd_chat, "type", None) == "channel":
+        if fwd_chat and getattr(fwd_chat, "id", None) == linked_id:
             return True
-
-        return False
     except Exception:
-        return False
-
+        pass
+    return False
 from telegram import Update, BotCommand, BotCommandScopeAllPrivateChats, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.constants import ChatMemberStatus, ParseMode
+from telegram.constants import ChatMemberStatus
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ChatMemberHandler, ContextTypes, filters
 
 def admin_add_link(bot_username: str) -> str:
@@ -136,9 +123,13 @@ UYATLI_SOZLAR = {"am", "ammisan", "ammislar", "ammislar?", "ammisizlar", "ammisi
 SUSPECT_KEYWORDS = {"open game", "play", "играть", "открыть игру", "game", "cattea", "gamee", "hamster", "notcoin", "tap to earn", "earn", "clicker"}
 SUSPECT_DOMAINS = {"cattea", "gamee", "hamster", "notcoin", "tgme", "t.me/gamee", "textra.fun", "ton"}
 
+import os
 import json
 import asyncio
+from telegram.constants import ParseMode
 from telegram.error import Forbidden, BadRequest, RetryAfter, TimedOut, NetworkError, TelegramError
+
+# ----------- Helpers -----------
 
 # ----------- DM Broadcast (Owner only) -----------
 SUB_USERS_FILE = "subs_users.json"
@@ -303,11 +294,11 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔹 <b>/kanaloff</b> — Мажбурий каналга аъзони ўчириш.\n"
         "🔹 <b>/majbur [3–25]</b> — Гурухга мажбурий одам қўшишни ёқиш.\n"
         "🔹 <b>/majburoff</b> — Мажбурий қўшишни ўчириш.\n"
-        "🔹 <b>/top</b> — TOP одам қўshганлар.\n"
+        "🔹 <b>/top</b> — TOP одам қўшганлар.\n"
         "🔹 <b>/cleangroup</b> — Одам қўшганлар хисобини 0 қилиш.\n"
         "🔹 <b>/count</b> — Ўзингиз нечта қўшдингиз.\n"
-        "🔹 <b>/replycount</b> — (Ответит) қилинган odam қўшганлар сони.\n"
-        "🔹 <b>/cleanuser</b> — (Ответит) қилинган odam қўшgan hisobini 0 qilish.\n"
+        "🔹 <b>/replycount</b> — (Ответит) қилинган одам қўшганлар сони.\n"
+        "🔹 <b>/cleanuser</b> — (Ответит) қилинган одам қўшган хисобини 0 қилиш.\n"
     )
     await update.effective_message.reply_text(text, parse_mode="HTML", disable_web_page_preview=True)
 
@@ -451,7 +442,7 @@ async def replycount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cnt = FOYDALANUVCHI_HISOBI.get(uid, 0)
     await msg.reply_text(f"👤 <code>{uid}</code> {cnt} ta odam qo‘shgan.", parse_mode="HTML")
 
-async def cleanuser(update: Update, Context: ContextTypes.DEFAULT_TYPE):
+async def cleanuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return await update.effective_message.reply_text("⛔ Faqat adminlar.")
     msg = update.effective_message
@@ -541,15 +532,9 @@ async def reklama_va_soz_filtri(update: Update, context: ContextTypes.DEFAULT_TY
     msg = update.effective_message
     if not msg or not msg.chat or not msg.from_user:
         return
-
-    # 🔒 Avtomatik forward/kanal postlari — teginmaymiz
-    if is_linked_channel_autoforward(msg):
-        return
-
     # Admin/creator/guruh nomidan xabarlar — teginmaymiz
     if await is_privileged_message(msg, context.bot):
         return
-
     # Oq ro'yxat
     if msg.from_user.id in WHITELIST or (msg.from_user.username and msg.from_user.username in WHITELIST):
         return
@@ -694,24 +679,19 @@ async def on_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-# Majburiy qo'shish filtri — yetmaganlarda 3 daqiqaga blok
+# Majburiy qo'shish filtri — yetmaganlarda 5 daqiqaga blok ham qo'yiladi
 async def majbur_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if MAJBUR_LIMIT <= 0:
         return
     msg = update.effective_message
     if not msg or not msg.from_user:
         return
-
-    # 🔒 Avtomatik forward/kanal postlari — majburiy tekshiruvdan chiqaramiz
-    if is_linked_channel_autoforward(msg):
-        return
-
     if await is_privileged_message(msg, context.bot):
         return
 
     uid = msg.from_user.id
 
-    # Agar foydalanuvchi hanuz blokda bo'lsa — xabarini o'chiramiz
+    # Agar foydalanuvchi hanuz blokda bo'lsa — xabarini o'chirib, hech narsa yubormaymiz
     now = datetime.now(timezone.utc)
     key = (msg.chat_id, uid)
     until_old = BLOK_VAQTLARI.get(key)
@@ -734,7 +714,7 @@ async def majbur_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         return
 
-    # 3 daqiqaga blok
+    # 5 daqiqaga blok (hozir 3 daqiqa)
     until = datetime.now(timezone.utc) + timedelta(minutes=3)
     BLOK_VAQTLARI[(msg.chat_id, uid)] = until
     try:
@@ -748,6 +728,7 @@ async def majbur_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log.warning(f"Restrict failed: {e}")
 
     qoldi = max(MAJBUR_LIMIT - cnt, 0)
+    until_str = until.strftime('%H:%M')
     kb = [
         [InlineKeyboardButton("✅ Odam qo‘shdim", callback_data=f"check_added:{uid}")],
         [InlineKeyboardButton("🎟 Imtiyoz berish", callback_data=f"grant:{uid}")],
@@ -783,8 +764,69 @@ async def set_commands(app):
         scope=BotCommandScopeAllPrivateChats()
     )
 
-# --- DM jo'natish buyruqlari ---
-import asyncio
+def main():
+    start_web()
+    app = ApplicationBuilder().token(TOKEN).build()
+    # Commands
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help))
+    app.add_handler(CommandHandler("id", id_berish))
+    app.add_handler(CommandHandler("tun", tun))
+    app.add_handler(CommandHandler("tunoff", tunoff))
+    app.add_handler(CommandHandler("ruxsat", ruxsat))
+    app.add_handler(CommandHandler("kanal", kanal))
+    app.add_handler(CommandHandler("kanaloff", kanaloff))
+    app.add_handler(CommandHandler("majbur", majbur))
+    app.add_handler(CommandHandler("majburoff", majburoff))
+    app.add_handler(CommandHandler("top", top_cmd))
+    app.add_handler(CommandHandler("cleangroup", cleangroup))
+    app.add_handler(CommandHandler("count", count_cmd))
+    app.add_handler(CommandHandler("replycount", replycount))
+    app.add_handler(CommandHandler("cleanuser", cleanuser))
+
+    # Callbacks
+    app.add_handler(CallbackQueryHandler(on_set_limit, pattern=r"^set_limit:"))
+    app.add_handler(CallbackQueryHandler(kanal_callback, pattern=r"^kanal_azo$"))
+    app.add_handler(CallbackQueryHandler(on_check_added, pattern=r"^check_added(?::\d+)?$"))
+    app.add_handler(CallbackQueryHandler(on_grant_priv, pattern=r"^grant:"))
+    app.add_handler(CallbackQueryHandler(lambda u,c: u.callback_query.answer(""), pattern=r"^noop$"))
+
+    # Events & Filters
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_members))
+    media_filters = (filters.TEXT | filters.PHOTO | filters.VIDEO | filters.Document.ALL | filters.ANIMATION | filters.VOICE | filters.VIDEO_NOTE | filters.GAME)
+    app.add_handler(MessageHandler(media_filters & (~filters.COMMAND), majbur_filter), group=-1)
+    app.add_handler(MessageHandler(media_filters & (~filters.COMMAND), reklama_va_soz_filtri))
+
+    app.post_init = set_commands
+
+    app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(CommandHandler("broadcastpost", broadcastpost))
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+async def on_my_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        st = update.my_chat_member.new_chat_member.status
+    except Exception:
+        return
+    if st in (ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED):
+        me = await context.bot.get_me()
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+            '🔐 Botni admin qilish', url=admin_add_link(me.username)
+        )]])
+        try:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=(
+                    '⚠️ Bot hozircha *admin emas*.\n'
+                    "Iltimos, pastdagi tugma orqali admin qiling, shunda barcha funksiyalar to'liq ishlaydi."
+                ),
+                reply_markup=kb,
+                parse_mode='Markdown'
+            )
+        except Exception:
+            pass
+
+
+
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """(OWNER & DM) Matnni barcha DM obunachilarga yuborish."""
     if update.effective_chat.type != "private":
@@ -838,71 +880,6 @@ async def broadcastpost(update: Update, context: ContextTypes.DEFAULT_TYPE):
             fail += 1
     _save_ids(SUB_USERS_FILE, users)
     await update.effective_message.reply_text(f"✅ Yuborildi: {ok} ta, ❌ xatolik: {fail} ta.")
-
-def main():
-    start_web()
-    app = ApplicationBuilder().token(TOKEN).build()
-    # Commands
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help))
-    app.add_handler(CommandHandler("id", id_berish))
-    app.add_handler(CommandHandler("tun", tun))
-    app.add_handler(CommandHandler("tunoff", tunoff))
-    app.add_handler(CommandHandler("ruxsat", ruxsat))
-    app.add_handler(CommandHandler("kanal", kanal))
-    app.add_handler(CommandHandler("kanaloff", kanaloff))
-    app.add_handler(CommandHandler("majbur", majbur))
-    app.add_handler(CommandHandler("majburoff", majburoff))
-    app.add_handler(CommandHandler("top", top_cmd))
-    app.add_handler(CommandHandler("cleangroup", cleangroup))
-    app.add_handler(CommandHandler("count", count_cmd))
-    app.add_handler(CommandHandler("replycount", replycount))
-    app.add_handler(CommandHandler("cleanuser", cleanuser))
-
-    # Callbacks
-    app.add_handler(CallbackQueryHandler(on_set_limit, pattern=r"^set_limit:"))
-    app.add_handler(CallbackQueryHandler(kanal_callback, pattern=r"^kanal_azo$"))
-    app.add_handler(CallbackQueryHandler(on_check_added, pattern=r"^check_added(?::\d+)?$"))
-    app.add_handler(CallbackQueryHandler(on_grant_priv, pattern=r"^grant:"))
-    app.add_handler(CallbackQueryHandler(lambda u,c: u.callback_query.answer(""), pattern=r"^noop$"))
-
-    # Events & Filters
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_members))
-    media_filters = (filters.TEXT | filters.PHOTO | filters.VIDEO | filters.Document.ALL | filters.ANIMATION | filters.VOICE | filters.VIDEO_NOTE | filters.GAME)
-    app.add_handler(MessageHandler(media_filters & (~filters.COMMAND), majbur_filter), group=-1)
-    app.add_handler(MessageHandler(media_filters & (~filters.COMMAND), reklama_va_soz_filtri))
-
-    app.post_init = set_commands
-
-    # Broadcast buyruqlari
-    app.add_handler(CommandHandler("broadcast", broadcast))
-    app.add_handler(CommandHandler("broadcastpost", broadcastpost))
-
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
-
-# (ixtiyoriy) Bot admin qilinmaganida eslatma — hozircha handler qo‘shilmagan
-async def on_my_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        st = update.my_chat_member.new_chat_member.status
-    except Exception:
-        return
-    if st in (ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED):
-        me = await context.bot.get_me()
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton(
-            '🔐 Botni admin qilish', url=admin_add_link(me.username)
-        )]])
-        try:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=(
-                    '⚠️ Bot hozircha *admin emas*.\n'
-                    "Iltimos, pastdagi tugma orqali admin qiling, shunda barcha funksiyalar to'liq ishlaydi."
-                ),
-                reply_markup=kb,
-                parse_mode='Markdown'
-            )
-        except Exception:
-            pass
 
 if __name__ == "__main__":
     main()
