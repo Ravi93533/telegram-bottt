@@ -11,33 +11,28 @@ def _extract_forward_origin_chat(msg: Message):
 
 def is_linked_channel_autoforward(msg: Message) -> bool:
     """
-    Guruhga bog'langan kanaldan (linked channel) avtomatik forward qilingan postni aniqlash.
-    Ba'zi holatlarda Telegram originni yashiradi (HiddenUser: Telegram), shuning uchun:
-    - is_automatic_forward True bo'lsa
-    - va guruhda linked_chat_id mavjud bo'lsa
-    => postni o‘tkazib yuboramiz (bloklamaymiz).
+    Avtomatik forward (kanal -> superguruh) postlarini aniqlash.
+    Agar xabar is_automatic_forward=True bo'lsa, darhol o‘tkazamiz —
+    ba'zi holatlarda Telegram originni yashiradi ("Telegram"),
+    lekin bu baribir kanalning auto-forward postidir.
+    Qo'shimcha ravishda sender_chat/forward_origin kanal bo'lsa ham o‘tkazamiz.
     """
     try:
-        if not getattr(msg, "is_automatic_forward", False):
-            return False
+        # 0) Har qanday auto-forward — o‘tkazib yuboriladi
+        if getattr(msg, "is_automatic_forward", False):
+            return True
 
-        chat = getattr(msg, "chat", None)
-        linked_id = getattr(chat, "linked_chat_id", None)
-        if not linked_id:
-            return False
-
-        # 1) sender_chat orqali tekshirish
+        # 1) Kanal nomidan yuborilgan (sender_chat.type == 'channel') — o‘tkazamiz
         sc = getattr(msg, "sender_chat", None)
-        if sc and getattr(sc, "id", None) == linked_id:
+        if sc and getattr(sc, "type", None) == "channel":
             return True
 
-        # 2) forward_origin/from_chat orqali tekshirish
+        # 2) Forward qilingan va manbasi kanal bo'lsa — ehtimol linked kanal postidir
         fwd_chat = _extract_forward_origin_chat(msg)
-        if fwd_chat and getattr(fwd_chat, "id", None) == linked_id:
+        if fwd_chat and getattr(fwd_chat, "type", None) == "channel":
             return True
 
-        # 3) Origin yashirilgan bo‘lsa ham, auto-forward + linked_chat_id bor — o‘tkazamiz
-        return True
+        return False
     except Exception:
         return False
 
@@ -308,11 +303,11 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔹 <b>/kanaloff</b> — Мажбурий каналга аъзони ўчириш.\n"
         "🔹 <b>/majbur [3–25]</b> — Гурухга мажбурий одам қўшишни ёқиш.\n"
         "🔹 <b>/majburoff</b> — Мажбурий қўшишни ўчириш.\n"
-        "🔹 <b>/top</b> — TOP одам қўшганлар.\n"
+        "🔹 <b>/top</b> — TOP одам қўshганлар.\n"
         "🔹 <b>/cleangroup</b> — Одам қўшганлар хисобини 0 қилиш.\n"
         "🔹 <b>/count</b> — Ўзингиз нечта қўшдингиз.\n"
-        "🔹 <b>/replycount</b> — (Ответит) қилинган одам қўшганлар сони.\n"
-        "🔹 <b>/cleanuser</b> — (Ответит) қилинган одам қўшган хисобини 0 қилиш.\n"
+        "🔹 <b>/replycount</b> — (Ответит) қилинган odam қўшганлар сони.\n"
+        "🔹 <b>/cleanuser</b> — (Ответит) қилинган odam қўшgan hisobini 0 qilish.\n"
     )
     await update.effective_message.reply_text(text, parse_mode="HTML", disable_web_page_preview=True)
 
@@ -456,7 +451,7 @@ async def replycount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cnt = FOYDALANUVCHI_HISOBI.get(uid, 0)
     await msg.reply_text(f"👤 <code>{uid}</code> {cnt} ta odam qo‘shgan.", parse_mode="HTML")
 
-async def cleanuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cleanuser(update: Update, Context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return await update.effective_message.reply_text("⛔ Faqat adminlar.")
     msg = update.effective_message
@@ -547,7 +542,7 @@ async def reklama_va_soz_filtri(update: Update, context: ContextTypes.DEFAULT_TY
     if not msg or not msg.chat or not msg.from_user:
         return
 
-    # 🔒 Linked kanalning avtomatik forward postlari — teginmaymiz
+    # 🔒 Avtomatik forward/kanal postlari — teginmaymiz
     if is_linked_channel_autoforward(msg):
         return
 
@@ -707,7 +702,7 @@ async def majbur_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.from_user:
         return
 
-    # 🔒 Linked kanal avtomatik forward — majburiy tekshiruvdan ham chiqaramiz
+    # 🔒 Avtomatik forward/kanal postlari — majburiy tekshiruvdan chiqaramiz
     if is_linked_channel_autoforward(msg):
         return
 
@@ -789,6 +784,7 @@ async def set_commands(app):
     )
 
 # --- DM jo'natish buyruqlari ---
+import asyncio
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """(OWNER & DM) Matnni barcha DM obunachilarga yuborish."""
     if update.effective_chat.type != "private":
