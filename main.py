@@ -1,4 +1,31 @@
-from telegram import Update, BotCommand, BotCommandScopeAllPrivateChats, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram 
+
+from telegram import Chat, Message
+
+
+def _extract_forward_origin_chat(msg: Message):
+    fo = getattr(msg, "forward_origin", None)
+    if fo is not None:
+        chat = getattr(fo, "chat", None) or getattr(fo, "from_chat", None)
+        if chat is not None:
+            return chat
+    return getattr(msg, "forward_from_chat", None)
+
+
+def is_linked_channel_autoforward(msg: Message) -> bool:
+    try:
+        if not getattr(msg, "is_automatic_forward", False):
+            return False
+        linked_id = getattr(msg.chat, "linked_chat_id", None)
+        if not linked_id:
+            return False
+        fwd_chat = _extract_forward_origin_chat(msg)
+        if fwd_chat and getattr(fwd_chat, "id", None) == linked_id:
+            return True
+    except Exception:
+        pass
+    return False
+import Update, BotCommand, BotCommandScopeAllPrivateChats, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatMemberStatus
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ChatMemberHandler, ContextTypes, filters
 
