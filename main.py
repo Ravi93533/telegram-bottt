@@ -322,9 +322,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 "Чтобы я работал, добавьте меня в группу и дайте <b>ПРАВА АДМИНА</b> 🙂\n\n"
 "<b>Для связи или вопроси</b> 👉 @Devona0107",
     parse_mode="HTML",
-    reply_markup=InlineKeyboardMarkup(kb)
-)
-    async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    reply_markup=InlineKeyboardMarkup(kb))
+async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "📌 <b>СПИСОК КОМАНД</b>\n\n"
 "🔹 <b>/id</b> — Показать ваш ID.\n\n"
