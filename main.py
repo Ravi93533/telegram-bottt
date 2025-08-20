@@ -516,10 +516,9 @@ async def kanal_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def on_check_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    await q.answer()  # bosilganini darhol tasdiqlab qo'yamiz
     uid = q.from_user.id
 
-    # faqat ogohlantirish olgan egasi bosa oladi (oldingi mantiqni saqlaymiz)
+    # faqat ogohlantirish olgan egasi bosa oladi
     data = q.data
     if ":" in data:
         try:
@@ -531,7 +530,7 @@ async def on_check_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cnt = FOYDALANUVCHI_HISOBI.get(uid, 0)
 
-    # Talab bajarilgan holat: to'liq ruxsat beramiz (oldingi mantiq o'sha-o'sha)
+    # Talab bajarilgan holat: to'liq ruxsat
     if uid in RUXSAT_USER_IDS or (MAJBUR_LIMIT > 0 and cnt >= MAJBUR_LIMIT):
         try:
             await context.bot.restrict_chat_member(
@@ -542,12 +541,11 @@ async def on_check_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
         BLOK_VAQTLARI.pop((q.message.chat.id, uid), None)
-        # Xabarni yangilab qo'yamiz
         return await q.edit_message_text("✅ Talab bajarilgan! Endi guruhda yozishingiz mumkin.")
 
-    # Yetarli emas holat: MODAL oynacha ko'rsatamiz (screenshotdagi kabi)
+    # Yetarli emas holat: MODAL oynacha
     qoldi = max(MAJBUR_LIMIT - cnt, 0)
-    await q.answer(
+    return await q.answer(
         f"❗ Siz hozirgacha {cnt} ta foydalanuvchi qo‘shdingiz va yana {qoldi} ta foydalanuvchi qo‘shishingiz kerak",
         show_alert=True
     )
