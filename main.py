@@ -607,10 +607,11 @@ async def reklama_va_soz_filtri(update: Update, context: ContextTypes.DEFAULT_TY
             [InlineKeyboardButton("➕ Guruhga qo‘shish", url=admin_add_link(context.bot.username))]
         ]
         await context.bot.send_message(
-            chat_id=msg.chat_id,
-            text=f"⚠️ {msg.from_user.first_name}, siz {KANAL_USERNAME} kanalga a’zo emassiz!",
-            reply_markup=InlineKeyboardMarkup(kb)
-        )
+    chat_id=msg.chat_id,
+    text=f"⚠️ {msg.from_user.mention_html()}, siz {KANAL_USERNAME} kanalga a’zo emassiz!",
+    reply_markup=InlineKeyboardMarkup(kb),
+    parse_mode="HTML"
+)
         return
 
     text = msg.text or msg.caption or ""
@@ -623,10 +624,11 @@ async def reklama_va_soz_filtri(update: Update, context: ContextTypes.DEFAULT_TY
         except:
             pass
         await context.bot.send_message(
-            chat_id=msg.chat_id,
-            text="⚠️ Inline bot orqali yuborilgan reklama taqiqlangan!",
-            reply_markup=add_to_group_kb(context.bot.username)
-        )
+    chat_id=msg.chat_id,
+    text=f"⚠️ {msg.from_user.mention_html()}, yashirin ssilka yuborish taqiqlangan!",
+    reply_markup=add_to_group_kb(context.bot.username),
+    parse_mode="HTML"
+)
         return
 
     # Tugmalarda game/web-app/URL bo'lsa — blok
@@ -667,10 +669,11 @@ async def reklama_va_soz_filtri(update: Update, context: ContextTypes.DEFAULT_TY
             except:
                 pass
             await context.bot.send_message(
-                chat_id=msg.chat_id,
-                text="⚠️ Botlardan kelgan reklama/havola yoki game taqiqlangan!",
-                reply_markup=add_to_group_kb(context.bot.username)
-            )
+    chat_id=msg.chat_id,
+    text=f"⚠️ {msg.from_user.mention_html()}, reklama/ssilka yuborish taqiqlangan!",
+    reply_markup=add_to_group_kb(context.bot.username),
+    parse_mode="HTML"
+)
             return
 
     # Yashirin yoki aniq ssilkalar
@@ -683,10 +686,11 @@ async def reklama_va_soz_filtri(update: Update, context: ContextTypes.DEFAULT_TY
                 except:
                     pass
                 await context.bot.send_message(
-                    chat_id=msg.chat_id,
-                    text=f"⚠️ {msg.from_user.first_name}, yashirin ssilka yuborish taqiqlangan!",
-                    reply_markup=add_to_group_kb(context.bot.username)
-                )
+    chat_id=msg.chat_id,
+    text=f"⚠️ {msg.from_user.mention_html()}, yashirin ssilka yuborish taqiqlangan!",
+    reply_markup=add_to_group_kb(context.bot.username),
+    parse_mode="HTML"
+)
                 return
 
     if any(x in low for x in ("t.me","telegram.me","@","www.","https://youtu.be","http://","https://")):
@@ -695,10 +699,11 @@ async def reklama_va_soz_filtri(update: Update, context: ContextTypes.DEFAULT_TY
         except:
             pass
         await context.bot.send_message(
-            chat_id=msg.chat_id,
-            text=f"⚠️ {msg.from_user.first_name}, reklama/ssilka yuborish taqiqlangan!",
-            reply_markup=add_to_group_kb(context.bot.username)
-        )
+    chat_id=msg.chat_id,
+    text=f"⚠️ {msg.from_user.mention_html()}, reklama/ssilka yuborish taqiqlangan!",
+    reply_markup=add_to_group_kb(context.bot.username),
+    parse_mode="HTML"
+)
         return
 
     # So'kinish
@@ -709,10 +714,11 @@ async def reklama_va_soz_filtri(update: Update, context: ContextTypes.DEFAULT_TY
         except:
             pass
         await context.bot.send_message(
-            chat_id=msg.chat_id,
-            text=f"⚠️ {msg.from_user.first_name}, guruhda so‘kinish taqiqlangan!",
-            reply_markup=add_to_group_kb(context.bot.username)
-        )
+    chat_id=msg.chat_id,
+    text=f"⚠️ {msg.from_user.mention_html()}, guruhda so‘kinish taqiqlangan!",
+    reply_markup=add_to_group_kb(context.bot.username),
+    parse_mode="HTML"
+)
         return
 
 # Yangi a'zolarni qo'shganlarni hisoblash hamda kirdi/chiqdi xabarlarni o'chirish
