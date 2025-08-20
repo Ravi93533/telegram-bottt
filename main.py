@@ -305,7 +305,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
     kb = [[InlineKeyboardButton("➕ Guruhga qo‘shish", url=admin_add_link(context.bot.username))]]
-    await update.effective_message.reply_markdown_v2_text(
+    await update.effective_message.reply_markdown_v2(
     "<b>САЛОМ👋</b>\n"
     "Мен барча рекламаларни, ссилкалани ва кирди чиқди хабарларни ҳамда ёрдамчи ботлардан келган рекламаларни гуруҳлардан <b>ўчириб</b> <b>тураман</b>\n\n"
     "Профилингиз <b>ID</b> гизни аниқлаб бераман\n\n"
