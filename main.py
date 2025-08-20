@@ -340,7 +340,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔹 <b>/replycount</b> — (Ответит) қилинган одам қўшганлар сони.\n"
         "🔹 <b>/cleanuser</b> — (Ответит) қилинган одам қўшган хисобини 0 қилиш.\n"
     )
-    await update.effective_message.reply_markdown_v2_text(text, parse_mode="HTML", disable_web_page_preview=True)
+    await update.effective_message.reply_markdown_v2(text, parse_mode="HTML", disable_web_page_preview=True)
 
 async def id_berish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
