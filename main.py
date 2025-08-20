@@ -516,9 +516,10 @@ async def kanal_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def on_check_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    await q.answer()
+    await q.answer()  # bosilganini darhol tasdiqlab qo'yamiz
     uid = q.from_user.id
-    # faqat ogohlantirish olgan egasi bosa oladi
+
+    # faqat ogohlantirish olgan egasi bosa oladi (oldingi mantiqni saqlaymiz)
     data = q.data
     if ":" in data:
         try:
@@ -527,9 +528,11 @@ async def on_check_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
             owner_id = None
         if owner_id and owner_id != uid:
             return await q.answer("Bu tugma siz uchun emas!", show_alert=True)
+
     cnt = FOYDALANUVCHI_HISOBI.get(uid, 0)
+
+    # Talab bajarilgan holat: to'liq ruxsat beramiz (oldingi mantiq o'sha-o'sha)
     if uid in RUXSAT_USER_IDS or (MAJBUR_LIMIT > 0 and cnt >= MAJBUR_LIMIT):
-        # ⬇️ To'liq ruxsatlar
         try:
             await context.bot.restrict_chat_member(
                 chat_id=q.message.chat.id,
@@ -539,10 +542,17 @@ async def on_check_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
         BLOK_VAQTLARI.pop((q.message.chat.id, uid), None)
-        await q.edit_message_text("✅ Talab bajarilgan! Endi guruhda yozishingiz mumkin.")
-    else:
-        qoldi = max(MAJBUR_LIMIT - cnt, 0)
-        await q.edit_message_text(f"❌ Hali yetarli emas. Qolgan: {qoldi} ta.")
+        # Xabarni yangilab qo'yamiz
+        return await q.edit_message_text("✅ Talab bajarilgan! Endi guruhda yozishingiz mumkin.")
+
+    # Yetarli emas holat: MODAL oynacha ko'rsatamiz (screenshotdagi kabi)
+    qoldi = max(MAJBUR_LIMIT - cnt, 0)
+    await q.answer(
+        f"❗ Siz hozirgacha {cnt} ta foydalanuvchi qo‘shdingiz va yana {qoldi} ta foydalanuvchi qo‘shishingiz kerak",
+        show_alert=True
+    )
+    # Xabarni o'zgartirmaymiz — tugmalar joyida qoladi
+    return
 
 async def on_grant_priv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
