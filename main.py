@@ -305,7 +305,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
     kb = [[InlineKeyboardButton("➕ Guruhga qo‘shish", url=admin_add_link(context.bot.username))]]
-    await update.message.reply_html(
+    await update.effective_message.reply_text(
     "<b>САЛОМ👋</b>\n"
     "Мен барча рекламаларни, ссилкалани ва кирди чиқди хабарларни ҳамда ёрдамчи ботлардан келган рекламаларни гуруҳлардан <b>ўчириб</b> <b>тураман</b>\n\n"
     "Профилингиз <b>ID</b> гизни аниқлаб бераман\n\n"
@@ -328,7 +328,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔹 <b>/tun</b> — Тун режими(шу дақиқадан гурухга ёзилган хабарлар автоматик ўчирилиб турилади).\n"
         "🔹 <b>/tunoff</b> — Тун режимини ўчириш.\n"
         "🔹 <b>/ruxsat</b> — (Ответит) орқали имтиёз бериш.\n\n"
-	"👥<b>ГУРУХГА МАЖБУР ОДАМ ҚЎШТИРИШ ВА КАНАЛГА МАЖБУР АЪЗО БЎЛДИРИШ</b>\n"
+	"👥<b>ГУРУХГА ва КАНАЛГА МАЖБУР ОДАМ ҚЎШТИРИШ</b>\n"
         "🔹 <b>/kanal @username</b> — Мажбурий кўрсатилган каналга аъзо қилдириш.\n"
         "🔹 <b>/kanaloff</b> — Мажбурий каналга аъзони ўчириш.\n"
         "🔹 <b>/majbur [3–25]</b> — Гурухга мажбурий одам қўшишни ёқиш.\n"
@@ -340,7 +340,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔹 <b>/replycount</b> — (Ответит) қилинган одам қўшганлар сони.\n"
         "🔹 <b>/cleanuser</b> — (Ответит) қилинган одам қўшган хисобини 0 қилиш.\n"
     )
-    await update.effective_message.reply_html(text, parse_mode="HTML", disable_web_page_preview=True)
+    await update.effective_message.reply_text(text, parse_mode="HTML", disable_web_page_preview=True)
 
 async def id_berish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
