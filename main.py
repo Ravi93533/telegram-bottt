@@ -290,9 +290,9 @@ async def is_privileged_message(msg, bot) -> bool:
         log.warning(f"is_privileged_message xatolik: {e}")
     return False
 
-\1
-global KANAL_USERNAME
-if not KANAL_USERNAME:
+async def kanal_tekshir(user_id: int, bot) -> bool:
+    global KANAL_USERNAME
+    if not KANAL_USERNAME:
     return True
 try:
     member = await bot.get_chat_member(KANAL_USERNAME, user_id)
