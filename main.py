@@ -293,7 +293,7 @@ async def is_privileged_message(msg, bot) -> bool:
 async def kanal_tekshir(user_id: int, bot) -> bool:
     global KANAL_USERNAME
     if not KANAL_USERNAME:
-    return True
+		return True
 try:
     member = await bot.get_chat_member(KANAL_USERNAME, user_id)
     allowed = {getattr(CMS, x) for x in ("MEMBER", "ADMINISTRATOR", "OWNER", "CREATOR") if hasattr(CMS, x)}
