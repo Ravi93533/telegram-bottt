@@ -495,7 +495,7 @@ async def kanal_tekshir(user_id: int, bot) -> bool:
     if not KANAL_USERNAME:
         return True
     try:
-        member = await bot.get_chat_member(KANAL_USERNAME, user_id)
+        member = await bot.get_chat_member(CHANNEL_USERNAME, user_id)
         return member.status in ("member", "creator", "administrator")
     except Exception as e:
         log.warning(f"kanal_tekshir xatolik: {e}")
@@ -598,23 +598,23 @@ async def ruxsat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.effective_message.reply_text("Пожалуйста, ответьте на сообщение пользователя.")
     uid = update.effective_message.reply_to_message.from_user.id
     RUXSAT_USER_IDS.add(uid)
-    await update.effective_message.reply_text(f"✅ <code>{uid}</code> foydalanuvchiga ruxsat berildi.", parse_mode="HTML")
+    await update.effective_message.reply_text(f"✅ <code>{uid}</code> Пользователю было предоставлено разрешение.", parse_mode="HTML")
 
 async def kanal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return await update.effective_message.reply_text("⛔ Только для администраторов.")
-    global KANAL_USERNAME
+    global CHANNEL_USERNAME
     if context.args:
-        KANAL_USERNAME = context.args[0]
-        await update.effective_message.reply_text(f"📢 Обязательный канал: {KANAL_USERNAME}")
+        CHANNEL_USERNAME = context.args[0]
+        await update.effective_message.reply_text(f"📢 Обязательный канал: {CHANNEL_USERNAME}")
     else:
         await update.effective_message.reply_text("Образец: /channel @username")
 
 async def kanaloff(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return await update.effective_message.reply_text("⛔ Только для администраторов.")
-    global KANAL_USERNAME
-    KANAL_USERNAME = None
+    global CHANNEL_USERNAME
+    CHANNEL_USERNAME = None
     await update.effective_message.reply_text("🚫 Обязательное требование к каналу удалено.")
 
 def majbur_klaviatura():
@@ -626,13 +626,13 @@ def majbur_klaviatura():
 async def majbur(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return await update.effective_message.reply_text("⛔ Только для администраторов.")
-    global MAJBUR_LIMIT
+    global FORCED_LIMIT
     if context.args:
         try:
             val = int(context.args[0])
             if not (3 <= val <= 25):
                 raise ValueError
-            MAJBUR_LIMIT = val
+            FORCED_LIMIT = val
             await update.effective_message.reply_text(
                 f"✅ Обязательный лимит добавления лиц: <b>{FORCED_LIMIT}</b>",
                 parse_mode="HTML"
@@ -655,14 +655,14 @@ async def on_set_limit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     data = q.data.split(":", 1)[1]
-    global MAJBUR_LIMIT
+    global FORCED_LIMIT
     if data == "cancel":
         return await q.edit_message_text("❌ ОТМЕНЕНО.")
     try:
         val = int(data)
         if not (3 <= val <= 25):
             raise ValueError
-        MAJBUR_LIMIT = val
+        FORCED_LIMIT = val
         await q.edit_message_text(f"✅ Обязательный лимит: <b>{FORCED_LIMIT}</b>", parse_mode="HTML")
     except Exception:
         await q.edit_message_text("❌ Недопустимое значение.")
@@ -670,8 +670,8 @@ async def on_set_limit(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def majburoff(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return await update.effective_message.reply_text("⛔ Только для администраторов.")
-    global MAJBUR_LIMIT
-    MAJBUR_LIMIT = 0
+    global FORCED_LIMIT
+    FORCED_LIMIT = 0
     await update.effective_message.reply_text("🚫 Обязательное добавление лица было удалено.")
 
 async def top_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -679,7 +679,7 @@ async def top_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.effective_message.reply_text("⛔ Только для администраторов.")
     if not FOYDALANUVCHI_HISOBI:
         return await update.effective_message.reply_text("Пока никто никого не добавил.")
-    items = sorted(FOYDALANUVCHI_HISOBI.items(), key=lambda x: x[1], reverse=True)[:100]
+    items = sorted(USER_ACCOUNT.items(), key=lambda x: x[1], reverse=True)[:100]
     lines = ["🏆 <b>ТОП 100 участников по добавлениям</b> (TOP 100):"]
     for i, (uid, cnt) in enumerate(items, start=1):
         lines.append(f"{i}. <code>{uid}</code> — {cnt} ta")
@@ -694,7 +694,7 @@ async def cleangroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def count_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
-    cnt = FOYDALANUVCHI_HISOBI.get(uid, 0)
+    cnt = USER_ACCOUNT.get(uid, 0)
     if MAJBUR_LIMIT > 0:
         qoldi = max(MAJBUR_LIMIT - cnt, 0)
         await update.effective_message.reply_text(f"📊 Вы {cnt} шт добавили людей. Осталось: {осталось:} шт.")
@@ -729,7 +729,7 @@ async def kanal_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not CHANNEL_USERNAME:
         return await q.edit_message_text("⚠️ Канал не настроен.")
     try:
-        member = await context.bot.get_chat_member(KANAL_USERNAME, user_id)
+        member = await context.bot.get_chat_member(CHANNEL_USERNAME, user_id)
         if member.status in ("member", "administrator", "creator"):
             # ⬇️ To'liq ruxsat beramiz (guruh sozlamalari darajasida)
             try:
@@ -871,7 +871,7 @@ async def reklama_va_soz_filtri(update: Update, context: ContextTypes.DEFAULT_TY
             pass
         await context.bot.send_message(
             chat_id=msg.chat_id,
-            text="⚠️ O‘yin/veb-app реклама кнопок запрещена!",
+            text="⚠️ GAME/veb-app реклама кнопок запрещена!",
             reply_markup=add_to_group_kb(context.bot.username)
         )
         return
@@ -1010,7 +1010,7 @@ async def majbur_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 5 daqiqaga blok (hozir 3 daqiqa)
-    until = datetime.now(timezone.utc) + timedelta(minutes=3)
+    until = datetime.now(timezone.utc) + timedelta(minutes=1)
     BLOK_VAQTLARI[(msg.chat_id, uid)] = until
     try:
         await context.bot.restrict_chat_member(
@@ -1022,13 +1022,13 @@ async def majbur_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.warning(f"Restrict failed: {e}")
 
-    qoldi = max(MAJBUR_LIMIT - cnt, 0)
+    qoldi = max(FORCED_LIMIT - cnt, 0)
     until_str = until.strftime('%H:%M')
     kb = [
         [InlineKeyboardButton("✅ Я добавил людей", callback_data=f"check_added:{uid}")],
         [InlineKeyboardButton("🎟 Выдать привилегию", callback_data=f"grant:{uid}")],
         [InlineKeyboardButton("➕ Добавить в группу", url=admin_add_link(context.bot.username))],
-        [InlineKeyboardButton("⏳ 3 daqiqaga bloklandi", callback_data="noop")]
+        [InlineKeyboardButton("⏳ 1 daqiqaga bloklandi", callback_data="noop")]
     ]
     await context.bot.send_message(
         chat_id=msg.chat_id,
@@ -1160,9 +1160,9 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def broadcastpost(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """(OWNER & DM) Reply qilingan postni barcha DM obunachilarga yuborish."""
     if update.effective_chat.type != "private":
-        return await update.effective_message.reply_text("⛔ Bu buyruq faqat DM (shaxsiy chat)da ishlaydi.")
+        return await update.effective_message.reply_text("⛔ Эта команда только DM (приватный чат)da работает.")
     if not is_owner(update):
-        return await update.effective_message.reply_text("⛔ Bu buyruq faqat bot egasiga ruxsat etilgan.")
+        return await update.effective_message.reply_text("⛔ Эта команда разрешена только владельцу бота.")
     msg = update.effective_message.reply_to_message
     if not msg:
         return await update.effective_message.reply_text("Foydalanish: /broadcastpost — yubormoqchi bo‘lgan xabarga reply qiling.")
