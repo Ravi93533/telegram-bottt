@@ -293,17 +293,17 @@ async def is_privileged_message(msg, bot) -> bool:
 async def kanal_tekshir(user_id: int, bot) -> bool:
     global KANAL_USERNAME
     if not KANAL_USERNAME:
-		return True
-try:
-    member = await bot.get_chat_member(KANAL_USERNAME, user_id)
-    allowed = {getattr(CMS, x) for x in ("MEMBER", "ADMINISTRATOR", "OWNER", "CREATOR") if hasattr(CMS, x)}
-    return member.status in allowed
-except Exception as e:
+        return True
     try:
-        log.warning(f"kanal_tekshir xatolik: {e}")
-    except Exception:
-        pass
-    return False
+        member = await bot.get_chat_member(KANAL_USERNAME, user_id)
+        allowed = {getattr(CMS, x) for x in ("MEMBER", "ADMINISTRATOR", "OWNER", "CREATOR") if hasattr(CMS, x)}
+        return member.status in allowed
+    except Exception as e:
+        try:
+            log.warning(f"kanal_tekshir xatolik: {e}")
+        except Exception:
+            pass
+        return False
 
 
 def matndan_sozlar_olish(matn: str):
