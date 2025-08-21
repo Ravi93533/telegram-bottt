@@ -645,7 +645,7 @@ async def majbur(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.effective_message.reply_text(
             "👥 Сколько раз я могу устанавливать обязательные добавления в группу? 👇\n"
-            «Не нужно добавлять — /forcedoff»,
+            "Не нужно добавлять — /forcedoff",
             reply_markup=majbur_klaviatura()
         )
 
