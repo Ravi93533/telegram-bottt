@@ -630,7 +630,7 @@ async def majbur(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         try:
             val = int(context.args[0])
-            if not (3 <= val <= 25):
+            if not (3 <= val <= 30):
                 raise ValueError
             FORCED_LIMIT = val
             await update.effective_message.reply_text(
@@ -639,7 +639,7 @@ async def majbur(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except ValueError:
             await update.effective_message.reply_text(
-                "❌ Недопустимое значение. Допустимый диапазон.: <b>3–25</b>. Например: <code>/majbur 10</code>",
+                "❌ Недопустимое значение. Допустимый диапазон: <b>3–30</b>. Например: <code>//forced 5</code>",
                 parse_mode="HTML"
             )
     else:
